@@ -348,3 +348,93 @@ forvalues g=1/3 {
 	display "*** gfrcat = `g' ***"
 	mixed UMODconclog UVOLlog $adj if gfrcat==`g' || treenbr:
 }
+
+
+
+
+
+
+
+
+
+*******************************************************
+*** SUMMARY: answers to the 4 questions (adjusted) ***
+*******************************************************
+// All models fully adjusted (mixed models, random intercept for family).
+// Graphs are back-transformed to original units (mg/24h, ug/mL, mL/24h):
+// predictions are squared (sqrt scale) or exponentiated (log scale), i.e. medians rather than means.
+
+capture program drop showres
+program define showres
+	args label expr
+	quietly lincom `expr'
+	display as text "`label'" as result %6.2f r(estimate) as text " (95% CI " as result %6.2f r(lb) as text " to " as result %6.2f r(ub) as text "), p = " as result %5.3f r(p)
+end
+
+// Urine volume axis labels (log scale shown as mL/24h)
+global uvlab `"6.397 "600" 6.908 "1000" 7.313 "1500" 7.601 "2000" 8.006 "3000""'
+
+
+// --- Question 1: UMOD excretion vs urine volume ---
+quietly mixed UMOD24hsqrt UVOLlog $adj || treenbr:
+display _newline as text "{hline 70}" _newline "Q1. UMOD excretion (sqrt mg/24h) vs urine volume (log mL/24h)" _newline "{hline 70}"
+showres "Slope: " "UVOLlog"
+
+quietly margins, at(UVOLlog=(${uvlo}(0.1)${uvhi})) expression(predict(xb)^2)
+marginsplot, recast(line) recastci(rarea) ciopts(fcolor(%30) lwidth(none)) ///
+	xlabel($uvlab) xtitle("Urine volume (mL/24h)") ytitle("UMOD excretion (mg/24h)") ///
+	title("Q1. UMOD excretion vs urine volume") subtitle("Adjusted predictions") name(Q1, replace)
+*graph export "Q1.png", replace
+
+
+// --- Question 2: effect of GFR on UMOD excretion vs urine volume ---
+display _newline as text "{hline 70}" _newline "Q2. Effect of eGFR on UMOD excretion vs urine volume" _newline "{hline 70}"
+quietly mixed UMOD24hsqrt c.UVOLlog##c.ckd_epi10 $adjnogfr || treenbr:
+quietly test c.UVOLlog#c.ckd_epi10
+display as text "p-interaction UVOL x eGFR (continuous): " as result %5.3f r(p)
+
+quietly mixed UMOD24hsqrt c.UVOLlog##i.gfrcat $adjnogfr || treenbr:
+quietly testparm c.UVOLlog#i.gfrcat
+display as text "p-interaction UVOL x eGFR strata (global): " as result %5.3f r(p)
+showres "Slope eGFR <60:    " "UVOLlog"
+showres "Slope eGFR 60-89:  " "UVOLlog + 2.gfrcat#c.UVOLlog"
+showres "Slope eGFR >=90:   " "UVOLlog + 3.gfrcat#c.UVOLlog"
+
+quietly margins gfrcat, at(UVOLlog=(${uvlo}(0.1)${uvhi})) expression(predict(xb)^2)
+marginsplot, xdimension(at(UVOLlog)) recast(line) recastci(rarea) ciopts(fcolor(%20) lwidth(none)) ///
+	xlabel($uvlab) xtitle("Urine volume (mL/24h)") ytitle("UMOD excretion (mg/24h)") ///
+	title("Q2. UMOD excretion vs urine volume by eGFR") subtitle("Adjusted predictions") name(Q2, replace)
+*graph export "Q2.png", replace
+
+
+// --- Question 3: UMOD concentration vs urine volume ---
+quietly mixed UMODconclog UVOLlog $adj || treenbr:
+display _newline as text "{hline 70}" _newline "Q3. UMOD concentration (log ug/mL) vs urine volume (log mL/24h)" _newline "{hline 70}"
+showres "Slope: " "UVOLlog"
+display as text "(slope = -1 would mean pure dilution, i.e. UMOD excretion independent of volume)"
+
+quietly margins, at(UVOLlog=(${uvlo}(0.1)${uvhi})) expression(exp(predict(xb)))
+marginsplot, recast(line) recastci(rarea) ciopts(fcolor(%30) lwidth(none)) ///
+	xlabel($uvlab) xtitle("Urine volume (mL/24h)") ytitle("UMOD concentration (ug/mL)") ///
+	title("Q3. UMOD concentration vs urine volume") subtitle("Adjusted predictions") name(Q3, replace)
+*graph export "Q3.png", replace
+
+
+// --- Question 4: effect of GFR on UMOD concentration vs urine volume ---
+display _newline as text "{hline 70}" _newline "Q4. Effect of eGFR on UMOD concentration vs urine volume" _newline "{hline 70}"
+quietly mixed UMODconclog c.UVOLlog##c.ckd_epi10 $adjnogfr || treenbr:
+quietly test c.UVOLlog#c.ckd_epi10
+display as text "p-interaction UVOL x eGFR (continuous): " as result %5.3f r(p)
+
+quietly mixed UMODconclog c.UVOLlog##i.gfrcat $adjnogfr || treenbr:
+quietly testparm c.UVOLlog#i.gfrcat
+display as text "p-interaction UVOL x eGFR strata (global): " as result %5.3f r(p)
+showres "Slope eGFR <60:    " "UVOLlog"
+showres "Slope eGFR 60-89:  " "UVOLlog + 2.gfrcat#c.UVOLlog"
+showres "Slope eGFR >=90:   " "UVOLlog + 3.gfrcat#c.UVOLlog"
+
+quietly margins gfrcat, at(UVOLlog=(${uvlo}(0.1)${uvhi})) expression(exp(predict(xb)))
+marginsplot, xdimension(at(UVOLlog)) recast(line) recastci(rarea) ciopts(fcolor(%20) lwidth(none)) ///
+	xlabel($uvlab) xtitle("Urine volume (mL/24h)") ytitle("UMOD concentration (ug/mL)") ///
+	title("Q4. UMOD concentration vs urine volume by eGFR") subtitle("Adjusted predictions") name(Q4, replace)
+*graph export "Q4.png", replace
