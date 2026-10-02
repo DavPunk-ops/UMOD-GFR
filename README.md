@@ -4,7 +4,8 @@ Analyses statistiques (Stata) sur l'uromoduline (UMOD), la copeptine et la réab
 
 ## Contenu
 
-- `stata/umod_copeptin_cross_sectional.do` : script d'analyse principal (variables, outliers, tableau 1, hypothèses 1 et 2, analyses de sensibilité).
+- `stata/umod_uvol_gfr.do` : script principal. Relation entre UMOD urinaire (excrétion sur 24h et concentration) et volume urinaire sur 24h, et effet du GFR (CKD-EPI) sur ces relations (interaction continue et strates <60, 60-89, ≥90).
+- `stata/umod_copeptin_cross_sectional.do` : script original UMOD/copeptine (référence).
 
 ## Données
 
