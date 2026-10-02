@@ -1,0 +1,10 @@
+# Données (ne pas versionner)
+*.dta
+*.csv
+*.xls
+*.xlsx
+
+# Sorties Stata
+*.gph
+*.log
+*.smcl
