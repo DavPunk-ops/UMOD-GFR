@@ -518,9 +518,9 @@ program define gfrheatmap
 	quietly predict xb, xb
 	gen pred=`backtransform'
 	gen eGFR=ckd_epi10*10
-	twoway (contour pred eGFR UVOLlog, levels(15) ccolors(%90)), ///
+	twoway (contour pred eGFR UVOLlog, levels(15)), ///
 		xlabel($uvlab) xtitle("Urine volume (mL/24h)") ytitle("eGFR (mL/min/1.73m{superscript:2})") ///
-		ztitle("`ztitle'") title("`gtitle'") subtitle("Adjusted predictions") name(`gname', replace)
+		clegend(title("`ztitle'", size(small))) title("`gtitle'") subtitle("Adjusted predictions") name(`gname', replace)
 	restore
 end
 
