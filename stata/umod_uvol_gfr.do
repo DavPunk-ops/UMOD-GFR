@@ -438,3 +438,94 @@ marginsplot, xdimension(at(UVOLlog)) recast(line) recastci(rarea) ciopts(fcolor(
 	xlabel($uvlab) xtitle("Urine volume (mL/24h)") ytitle("UMOD concentration (ug/mL)") ///
 	title("Q4. UMOD concentration vs urine volume by eGFR") subtitle("Adjusted predictions") name(Q4, replace)
 *graph export "Q4.png", replace
+
+
+
+
+
+
+
+
+
+*************************************************************
+*** ALTERNATIVE GFR MODELLING: tertiles and heatmap (adjusted) ***
+*************************************************************
+// GFR tertiles (defined in the analysed sample)
+xtile gfrtert=ckd_epi, nquantiles(3)
+label define gfrtert 1 "eGFR T1" 2 "eGFR T2" 3 "eGFR T3"
+label values gfrtert gfrtert
+tabstat ckd_epi, by(gfrtert) stats(n min p50 max)
+
+// Range of eGFR (1st to 99th percentile) for the heatmaps
+_pctile ckd_epi10, p(1 99)
+global gfrlo=round(r(r1), 0.5)
+global gfrhi=round(r(r2), 0.5)
+
+
+// --- Q2 with GFR tertiles ---
+display _newline as text "{hline 70}" _newline "Q2 (tertiles). Effect of eGFR on UMOD excretion vs urine volume" _newline "{hline 70}"
+quietly mixed UMOD24hsqrt c.UVOLlog##i.gfrtert $adjnogfr || treenbr:
+quietly testparm c.UVOLlog#i.gfrtert
+display as text "p-interaction UVOL x eGFR tertiles (global): " as result %5.3f r(p)
+showres "Slope eGFR T1: " "UVOLlog"
+showres "Slope eGFR T2: " "UVOLlog + 2.gfrtert#c.UVOLlog"
+showres "Slope eGFR T3: " "UVOLlog + 3.gfrtert#c.UVOLlog"
+
+quietly margins gfrtert, at(UVOLlog=(${uvlo}(0.1)${uvhi})) expression(predict(xb)^2)
+marginsplot, xdimension(at(UVOLlog)) recast(line) recastci(rarea) ciopts(fcolor(%20) lwidth(none)) ///
+	xlabel($uvlab) xtitle("Urine volume (mL/24h)") ytitle("UMOD excretion (mg/24h)") ///
+	title("Q2. UMOD excretion vs urine volume by eGFR tertile") subtitle("Adjusted predictions") name(Q2tert, replace)
+*graph export "Q2_tertiles.png", replace
+
+
+// --- Q4 with GFR tertiles ---
+display _newline as text "{hline 70}" _newline "Q4 (tertiles). Effect of eGFR on UMOD concentration vs urine volume" _newline "{hline 70}"
+quietly mixed UMODconclog c.UVOLlog##i.gfrtert $adjnogfr || treenbr:
+quietly testparm c.UVOLlog#i.gfrtert
+display as text "p-interaction UVOL x eGFR tertiles (global): " as result %5.3f r(p)
+showres "Slope eGFR T1: " "UVOLlog"
+showres "Slope eGFR T2: " "UVOLlog + 2.gfrtert#c.UVOLlog"
+showres "Slope eGFR T3: " "UVOLlog + 3.gfrtert#c.UVOLlog"
+
+quietly margins gfrtert, at(UVOLlog=(${uvlo}(0.1)${uvhi})) expression(exp(predict(xb)))
+marginsplot, xdimension(at(UVOLlog)) recast(line) recastci(rarea) ciopts(fcolor(%20) lwidth(none)) ///
+	xlabel($uvlab) xtitle("Urine volume (mL/24h)") ytitle("UMOD concentration (ug/mL)") ///
+	title("Q4. UMOD concentration vs urine volume by eGFR tertile") subtitle("Adjusted predictions") name(Q4tert, replace)
+*graph export "Q4_tertiles.png", replace
+
+
+// --- Heatmaps: continuous UVOL x continuous eGFR interaction ---
+// Predictions from the fully adjusted continuous interaction model,
+// on a grid of UVOL and eGFR, with other covariates fixed at their sample mean.
+capture program drop gfrheatmap
+program define gfrheatmap
+	args outcome backtransform ztitle gname gtitle
+	quietly mixed `outcome' c.UVOLlog##c.ckd_epi10 $adjnogfr || treenbr:
+	foreach v of global adjnogfr {
+		quietly sum `v'
+		local m_`v'=r(mean)
+	}
+	preserve
+	clear
+	local nuv=round((${uvhi}-${uvlo})/0.05)+1
+	local ngfr=round((${gfrhi}-${gfrlo})/0.25)+1
+	quietly set obs `=`nuv'*`ngfr''
+	gen UVOLlog=${uvlo}+mod(_n-1, `nuv')*0.05
+	gen ckd_epi10=${gfrlo}+floor((_n-1)/`nuv')*0.25
+	foreach v of global adjnogfr {
+		gen `v'=`m_`v''
+	}
+	quietly predict xb, xb
+	gen pred=`backtransform'
+	gen eGFR=ckd_epi10*10
+	twoway (contour pred eGFR UVOLlog, levels(15) ccolors(%90)), ///
+		xlabel($uvlab) xtitle("Urine volume (mL/24h)") ytitle("eGFR (mL/min/1.73m{superscript:2})") ///
+		ztitle("`ztitle'") title("`gtitle'") subtitle("Adjusted predictions") name(`gname', replace)
+	restore
+end
+
+gfrheatmap UMOD24hsqrt "xb^2" "UMOD excretion (mg/24h)" Q2heat "Q2. UMOD excretion by urine volume and eGFR"
+*graph export "Q2_heatmap.png", replace
+
+gfrheatmap UMODconclog "exp(xb)" "UMOD concentration (ug/mL)" Q4heat "Q4. UMOD concentration by urine volume and eGFR"
+*graph export "Q4_heatmap.png", replace
